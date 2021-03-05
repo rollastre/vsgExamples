@@ -22,52 +22,6 @@ void update(vsg::vec3Array2D& image, float value)
     }
 }
 
-vsg::BufferInfo myCopyDataToStagingBuffer(vsg::Context& context, const vsg::Data* data, VkFormat targetFormat)
-{
-    if (!data) return {};
-
-    if (data->getLayout().format == targetFormat) return vsg::copyDataToStagingBuffer(context, data);
-
-    using value_type = float;
-    const uint8_t* src_ptr = reinterpret_cast<const uint8_t*>(data->dataPointer());
-    size_t valueCount = data->valueCount();
-    size_t stride = data->getLayout().stride;
-
-    VkDeviceSize targetValueSize = 16; // vec4
-    VkDeviceSize imageTotalSize = valueCount * targetValueSize;
-
-    VkDeviceSize alignment = std::max(VkDeviceSize(4), targetValueSize);
-    vsg::BufferInfo stagingBufferInfo = context.stagingMemoryBufferPools->reserveBuffer(imageTotalSize, alignment, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_SHARING_MODE_EXCLUSIVE, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-
-    // std::cout<<"stagingBufferInfo.buffer "<<stagingBufferInfo.buffer.get()<<", "<<stagingBufferInfo.offset<<", "<<stagingBufferInfo.range<<")"<<std::endl;
-
-    vsg::ref_ptr<vsg::Buffer> imageStagingBuffer(stagingBufferInfo.buffer);
-    vsg::ref_ptr<vsg::DeviceMemory> imageStagingMemory(imageStagingBuffer->getDeviceMemory(context.deviceID));
-
-    if (!imageStagingMemory) return {};
-
-    void* buffer_data;
-    imageStagingMemory->map(imageStagingBuffer->getMemoryOffset(context.deviceID) + stagingBufferInfo.offset, imageTotalSize, 0, &buffer_data);
-
-    value_type* dest_ptr = reinterpret_cast<value_type*>(buffer_data);
-    value_type default_value = 1.0f;
-    for(size_t i = 0; i< valueCount; ++i)
-    {
-        const value_type* value_ptr = reinterpret_cast<const value_type*>(src_ptr + i * stride);
-        (*dest_ptr++) = *(value_ptr++);
-        (*dest_ptr++) = *(value_ptr++);
-        (*dest_ptr++) = *(value_ptr++);
-        (*dest_ptr++) = default_value;
-    }
-
-    imageStagingMemory->unmap();
-
-    std::cout<<"imageStagingBuffer = "<<imageStagingBuffer<<", buffer_data = "<<buffer_data<<std::endl;
-
-    return stagingBufferInfo;
-}
-
 int main(int argc, char** argv)
 {
     // set up defaults and read command line arguments to override them
@@ -76,6 +30,7 @@ int main(int argc, char** argv)
     auto windowTraits = vsg::WindowTraits::create();
     windowTraits->debugLayer = arguments.read({"--debug", "-d"});
     windowTraits->apiDumpLayer = arguments.read({"--api", "-a"});
+    if (arguments.read("--IMMEDIATE")) windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
     if (arguments.read("--double-buffer")) windowTraits->swapchainPreferences.imageCount = 2;
     if (arguments.read("--triple-buffer")) windowTraits->swapchainPreferences.imageCount = 3; // default
     arguments.read({"--window", "-w"}, windowTraits->width, windowTraits->height);
@@ -212,6 +167,7 @@ int main(int argc, char** argv)
     auto commandGraph = vsg::createCommandGraphForView(window, camera, scenegraph);
 
     auto copyCmd = vsg::CopyAndReleaseImage::create();
+    copyCmd->stagingMemoryBufferPools = vsg::MemoryBufferPools::create("Staging_MemoryBufferPool", window->getOrCreateDevice(), vsg::BufferPreferences{});
     commandGraph->getChildren().insert(commandGraph->getChildren().begin(), copyCmd);
 
     viewer->assignRecordAndSubmitTaskAndPresentation({commandGraph});
@@ -226,9 +182,6 @@ int main(int argc, char** argv)
     // texture has been filled in so it's now safe to get the ImageInfo that holds the handles to the texture's
     vsg::ImageInfo textureImageInfo;
     if (!texture->imageInfoList.empty()) textureImageInfo = texture->imageInfoList[0]; // contextID=0, and only one imageData
-
-    // create a context to manage the DeviceMemoryPool for us when we need to copy data to a staging buffer
-    vsg::Context context(window->getOrCreateDevice());
 
     VkFormat targetFormat = textureImageInfo.imageView->format;
 
@@ -246,28 +199,15 @@ int main(int argc, char** argv)
         // update texture data
         update(*textureData, time);
 
-        // transfer data to staging buffer
-        auto stagingBufferData = myCopyDataToStagingBuffer(context, textureData, targetFormat);
-
-        // schedule a copy command to do the staging buffer to the texture image, this copy command is recorded to the appropriate command buffer by viewer->recordAndSubmit().
-
-        vsg::CopyAndReleaseImage::CopyData cd(stagingBufferData, textureImageInfo, 1);
-        cd.width = textureData->width();
-        cd.height = textureData->height();
-        cd.depth = textureData->depth();
-        cd.layout.format = VK_FORMAT_R32G32B32_SFLOAT;
-        cd.layout.stride = 16;
-
-        copyCmd->add(cd);
+        // copy data to staging buffer and isse a copy command to transfer to the GPU texture image
+        copyCmd->copy(textureData, textureImageInfo);
 
         viewer->update();
 
         viewer->recordAndSubmit();
 
         viewer->present();
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+   }
 
     // clean up done automatically thanks to ref_ptr<>
     return 0;
