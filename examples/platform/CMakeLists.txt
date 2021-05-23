@@ -1,3 +1,5 @@
 if (ANDROID)
     add_subdirectory(vsgandroidnative)
+elseif (IOS)
+    add_subdirectory(vsgiosnative)
 endif()
