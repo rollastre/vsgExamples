@@ -9,6 +9,8 @@ cmake_minimum_required(VERSION 3.8)
 #endif()
 project(IOS_vsg_native_example)
 
+set(TARGET vsgiosnative)
+
 find_library(UIKIT_LIBRARY UiKit)
 find_library(QUARTZCORE_LIBRARY QuartzCore)
 
@@ -16,13 +18,32 @@ set(LIBRARIES ${LIBRARIES} PRIVATE ${UIKIT_LIBRARY} PRIVATE ${QUARTZCORE_LIBRARY
 
 set(SOURCES
     main.m
+    vsg_iOS_ViewController.h
+    vsg_iOS_ApplicationDelegate.h
+    vsg_iOS_ApplicationDelegate.m
+    vsg_iOS_ViewController.m
 )
-
 
 add_executable(
-    vsgiosnative
-    ${SOURCES}
+    ${TARGET}
+${SOURCES}
 )
+
+
+#set(bundle_resources ${JUCER_ICON_FILE})
+if(IOS)
+set(bundle_resources
+  #${JUCER_XCASSETS} ${JUCER_LAUNCH_STORYBOARD_FILE}
+  Resources/Main.storyboard
+)
+endif()
+
+target_sources(${TARGET} PRIVATE ${bundle_resources})
+set_source_files_properties(${bundle_resources} PROPERTIES
+   MACOSX_PACKAGE_LOCATION "Resources"
+)
+source_group("Resources" FILES ${bundle_resources})
+
 
 target_link_libraries(
     vsgiosnative

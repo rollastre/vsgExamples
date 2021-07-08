@@ -6,6 +6,7 @@
 //
 
 #import "vsg_iOS_ApplicationDelegate.h"
+#import "vsg_iOS_ViewController.h"
 
 
 
@@ -19,6 +20,13 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
+    
+    self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+    
+    self.viewController = [[vsg_iOS_ViewController alloc] init];
+    self.window.rootViewController = self.viewController;
+    //self.viewController.view.backgroundColor = UIColor.redColor;
+    [self.window makeKeyAndVisible];
     return YES;
 }
 
