@@ -26,23 +26,8 @@ set(SOURCES
 
 add_executable(
     ${TARGET}
-${SOURCES}
+    ${SOURCES}
 )
-
-
-#set(bundle_resources ${JUCER_ICON_FILE})
-if(IOS)
-set(bundle_resources
-  #${JUCER_XCASSETS} ${JUCER_LAUNCH_STORYBOARD_FILE}
-  Resources/Main.storyboard
-)
-endif()
-
-target_sources(${TARGET} PRIVATE ${bundle_resources})
-set_source_files_properties(${bundle_resources} PROPERTIES
-   MACOSX_PACKAGE_LOCATION "Resources"
-)
-source_group("Resources" FILES ${bundle_resources})
 
 
 target_link_libraries(
