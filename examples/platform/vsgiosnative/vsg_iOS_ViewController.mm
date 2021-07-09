@@ -4,6 +4,7 @@
 //#include <MoltenVK/mvk_vulkan.h>
 //#include "../../Vulkan-Tools/cube/cube.c"
 
+#include <vsg/all.h>
 
 #pragma mark -
 #pragma mark vsg_iOS_ViewController
@@ -24,7 +25,7 @@
     [super viewDidLoad];
 
     self.view.contentScaleFactor = UIScreen.mainScreen.nativeScale;
-
+    self.view.backgroundColor = UIColor.blueColor;
 #if TARGET_OS_SIMULATOR
     // Avoid linear host-coherent texture loading on simulator
     const char* argv[] = { "cube", "--use_staging" };
